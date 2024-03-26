@@ -1,9 +1,17 @@
-;;; prettier-js.el --- Minor mode to format JS code on file save
+;;; biomejs-format.el --- Minor mode to format JS code with Biome on file save
 
+;; Author: James Long and contributors
+;; Maintainer: Kanon Kakuno <yadex205@yadex205.com>
+;; Created: 26 March 2024
+;; Url: https://github.com/yadex205/emacs-biomejs-format
+;; SPDX-License-Identifier: BSD-3-Clause
 ;; Version: 0.1.0
+;; Package-Requires: ((emacs "24.1"))
+;; Keywords: convenience wp edit js
 
 ;; Copyright (c) 2014 The go-mode Authors. All rights reserved.
 ;; Portions Copyright (c) 2015-present, Facebook, Inc. All rights reserved.
+;; Portions Copyright (c) 2024 Kanon Kakuno
 
 ;; Redistribution and use in source and binary forms, with or without
 ;; modification, are permitted provided that the following conditions are
@@ -31,60 +39,55 @@
 ;; (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 ;; OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.)
 
-;; Author: James Long and contributors
-;; Created: 10 January 2017
-;; Url: https://github.com/prettier/prettier-emacs
-;; Keywords: convenience wp edit js
-
 ;; This file is not part of GNU Emacs.
 
 ;;; Commentary:
-;; Formats your JavaScript code using 'prettier' on file save.
+;; Formats your JavaScript or other supported code using 'biome' on file save.
 
 ;;; Code:
 
-(defgroup prettier-js nil
-  "Minor mode to format JS code on file save"
+(defgroup biomejs-format nil
+  "Minor mode to format JS code with Biome on file save."
   :group 'languages
-  :prefix "prettier-js"
-  :link '(url-link :tag "Repository" "https://github.com/prettier/prettier"))
+  :prefix "biomejs-format"
+  :link '(url-link :tag "Repository" "https://github.com/biomejs/biome"))
 
-(defcustom prettier-js-command "prettier"
-  "The 'prettier' command."
+(defcustom biomejs-format-biome-command "biome"
+  "The `biome` command."
   :type 'string
-  :group 'prettier-js)
+  :group 'biomejs-format)
 
-(defcustom prettier-js-args '()
-  "List of args to send to prettier command."
+(defcustom biomejs-format-biome-args '("format")
+  "List of args to send to biome command."
   :type '(repeat string)
-  :group 'prettier-js)
+  :group 'biomejs-format)
 
-(defcustom prettier-js-show-errors 'buffer
-    "Where to display prettier error output.
+(defcustom biomejs-format-show-errors 'buffer
+    "Where to display biome error output.
 It can either be displayed in its own buffer, in the echo area, or not at all.
 Please note that Emacs outputs to the echo area when writing
-files and will overwrite prettier's echo output if used from inside
+files and will overwrite biome's echo output if used from inside
 a `before-save-hook'."
     :type '(choice
             (const :tag "Own buffer" buffer)
             (const :tag "Echo area" echo)
             (const :tag "None" nil))
-      :group 'prettier-js)
+      :group 'biomejs-format)
 
-(defcustom prettier-js-width-mode nil
+(defcustom biomejs-format-width-mode nil
   "Specify width when formatting buffer contents."
   :type '(choice
           (const :tag "Window width" window)
           (const :tag "Fill column" fill)
           (const :tag "None" nil))
-  :group 'prettier-js)
+  :group 'biomejs-format)
 
-(defun prettier-js--goto-line (line)
+(defun biomejs-format--goto-line (line)
   "Move cursor to line LINE."
   (goto-char (point-min))
     (forward-line (1- line)))
 
-(defun prettier-js--apply-rcs-patch (patch-buffer)
+(defun biomejs-format--apply-rcs-patch (patch-buffer)
   "Apply an RCS-formatted diff from PATCH-BUFFER to the current buffer."
   (let ((target-buffer (current-buffer))
         ;; Relative offset between buffer line numbers and line numbers
@@ -103,7 +106,7 @@ a `before-save-hook'."
         (goto-char (point-min))
         (while (not (eobp))
           (unless (looking-at "^\\([ad]\\)\\([0-9]+\\) \\([0-9]+\\)")
-            (error "Invalid rcs patch or internal error in prettier-js--apply-rcs-patch"))
+            (error "Invalid rcs patch or internal error in biomejs-format--apply-rcs-patch"))
           (forward-line)
           (let ((action (match-string 1))
                 (from (string-to-number (match-string 2)))
@@ -120,31 +123,31 @@ a `before-save-hook'."
                     (insert text)))))
              ((equal action "d")
               (with-current-buffer target-buffer
-                (prettier-js--goto-line (- from line-offset))
+                (biomejs-format--goto-line (- from line-offset))
                 (setq line-offset (+ line-offset len))
                 (let ((beg (point)))
                   (forward-line len)
                   (delete-region (point) beg))))
              (t
-              (error "Invalid rcs patch or internal error in prettier-js--apply-rcs-patch")))))))))
+              (error "Invalid rcs patch or internal error in biomejs-format--apply-rcs-patch")))))))))
 
-(defun prettier-js--process-errors (filename errorfile errbuf)
-  "Process errors for FILENAME, using an ERRORFILE and display the output in ERRBUF."
+(defun biomejs-format--process-errors (filename errorfile errbuf)
+  "Process errors for FILENAME, using ERRORFILE and display the output in ERRBUF."
   (with-current-buffer errbuf
-    (if (eq prettier-js-show-errors 'echo)
+    (if (eq biomejs-format-show-errors 'echo)
         (progn
           (message "%s" (buffer-string))
-          (prettier-js--kill-error-buffer errbuf))
+          (biomejs-format--kill-error-buffer errbuf))
       (insert-file-contents errorfile nil nil nil)
-      ;; Convert the prettier stderr to something understood by the compilation mode.
+      ;; Convert the biome stderr to something understood by the compilation mode.
       (goto-char (point-min))
-      (insert "prettier errors:\n")
+      (insert "biomejs errors:\n")
       (while (search-forward-regexp "^stdin" nil t)
         (replace-match (file-name-nondirectory filename)))
       (compilation-mode)
       (display-buffer errbuf))))
 
-(defun prettier-js--kill-error-buffer (errbuf)
+(defun biomejs-format--kill-error-buffer (errbuf)
   "Kill buffer ERRBUF."
   (let ((win (get-buffer-window errbuf)))
     (if win
@@ -153,23 +156,23 @@ a `before-save-hook'."
         (erase-buffer))
       (kill-buffer errbuf))))
 
-(defun prettier-js ()
-   "Format the current buffer according to the prettier tool."
+(defun biomejs-format ()
+   "Format the current buffer according to the Biome tool."
    (interactive)
    (let* ((ext (file-name-extension buffer-file-name t))
-          (bufferfile (make-temp-file "prettier" nil ext))
-          (outputfile (make-temp-file "prettier" nil ext))
-          (errorfile (make-temp-file "prettier" nil ext))
-          (errbuf (if prettier-js-show-errors (get-buffer-create "*prettier errors*")))
-          (patchbuf (get-buffer-create "*prettier patch*"))
+          (bufferfile (make-temp-file "biomejs" nil ext))
+          (outputfile (make-temp-file "biomejs" nil ext))
+          (errorfile (make-temp-file "biomejs" nil ext))
+          (errbuf (if biomejs-format-show-errors (get-buffer-create "*biomejs errors*")))
+          (patchbuf (get-buffer-create "*biomejs patch*"))
           (coding-system-for-read 'utf-8)
           (coding-system-for-write 'utf-8)
           (width-args
            (cond
-            ((equal prettier-js-width-mode 'window)
-             (list "--print-width" (number-to-string (window-body-width))))
-            ((equal prettier-js-width-mode 'fill)
-             (list "--print-width" (number-to-string fill-column)))
+            ((equal biomejs-format-width-mode 'window)
+             (list "--line-width" (number-to-string (window-body-width))))
+            ((equal biomejs-format-width-mode 'fill)
+             (list "--line-width" (number-to-string fill-column)))
             (t
              '()))))
      (unwind-protect
@@ -183,31 +186,30 @@ a `before-save-hook'."
            (with-current-buffer patchbuf
              (erase-buffer))
            (if (zerop (apply 'call-process
-                             prettier-js-command bufferfile (list (list :file outputfile) errorfile)
-                             nil (append prettier-js-args width-args (list "--stdin" "--stdin-filepath" buffer-file-name))))
+                             biomejs-format-biome-command bufferfile (list (list :file outputfile) errorfile)
+                             nil (append biomejs-format-biome-args width-args (list "--stdin-file-path" buffer-file-name))))
                (progn
                  (call-process-region (point-min) (point-max) "diff" nil patchbuf nil "-n" "--strip-trailing-cr" "-"
                                       outputfile)
-                 (prettier-js--apply-rcs-patch patchbuf)
-                 (message "Applied prettier with args `%s'" prettier-js-args)
-                 (if errbuf (prettier-js--kill-error-buffer errbuf)))
-             (message "Could not apply prettier")
+                 (biomejs-format--apply-rcs-patch patchbuf)
+                 (message "Applied biome with args `%s'" biomejs-format-biome-args)
+                 (if errbuf (biomejs-format--kill-error-buffer errbuf)))
+             (message "Could not apply biome")
              (if errbuf
-                 (prettier-js--process-errors (buffer-file-name) errorfile errbuf))
-             ))
+                 (biomejs-format--process-errors (buffer-file-name) errorfile errbuf))))
        (kill-buffer patchbuf)
        (delete-file errorfile)
        (delete-file bufferfile)
        (delete-file outputfile))))
 
 ;;;###autoload
-(define-minor-mode prettier-js-mode
-  "Runs prettier on file save when this mode is turned on"
-  :lighter " Prettier"
+(define-minor-mode biomejs-format-mode
+  "Runs Biome on file save when this mode is turned on."
+  :lighter " BiomeFmt"
   :global nil
-  (if prettier-js-mode
-      (add-hook 'before-save-hook 'prettier-js nil 'local)
-    (remove-hook 'before-save-hook 'prettier-js 'local)))
+  (if biomejs-format-mode
+      (add-hook 'before-save-hook 'biomejs-format nil 'local)
+    (remove-hook 'before-save-hook 'biomejs-format 'local)))
 
-(provide 'prettier-js)
-;;; prettier-js.el ends here
+(provide 'biomejs-format)
+;;; biomejs-format.el ends here
