@@ -3,6 +3,8 @@
 biomejs-format is a function that formats the current buffer using [Biome](https://github.com/biomejs/biome). The
 package also exports a minor mode that applies `(biomejs-format)` on save.
 
+This is forked from https://github.com/prettier/prettier-emacs and made for users who switched from Prettier to Biome, to replace that easily.
+
 ## Configuration
 
 ### Requirements
@@ -96,3 +98,8 @@ If you want to use your project's biome version you can rely on https://github.c
        (add-hook 'web-mode-hook #'add-node-modules-path)
        (add-hook 'web-mode-hook #'biomejs-format-mode)))
 ```
+
+## See also
+
+* https://github.com/cxa/lsp-biome provides integration for `lsp-mode` with more features.
+* https://github.com/purcell/emacs-reformatter provides smarter way to define reformatters.
