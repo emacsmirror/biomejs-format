@@ -5,7 +5,7 @@
 ;; Created: 26 March 2024
 ;; Url: https://github.com/yadex205/emacs-biomejs-format
 ;; SPDX-License-Identifier: BSD-3-Clause
-;; Version: 0.1.0
+;; Version: 0.1.1
 ;; Package-Requires: ((emacs "24.1"))
 ;; Keywords: convenience wp edit js
 
